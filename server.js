@@ -4,7 +4,6 @@ const session = require("express-session");
 const cors = require("cors");
 const client = require("./db");
 const bcrypt = require("bcrypt");
-const { destroy } = require("express-session");
 
 app.use(cors());
 app.use(express.json());
@@ -34,21 +33,47 @@ app.get("/api", (req, res) => {
 
 app.get("/Produse", async (req, res) => {
   try {
-    const toateProdusele = await client.query("select * from produse");
-    res.json(toateProdusele.rows);
+
+    if (req.query.categorie_produs) {
+      const { categorie_produs, marca } = req.query;
+      let query = "SELECT * FROM produse WHERE 1=1";
+      let params = [];
+      if (categorie_produs) {
+        query += " AND categorie_produs = $1";
+        params.push(categorie_produs.toLowerCase());
+      }
+      if (marca) {
+        query += " AND marca = $2";
+        params.push(marca.toLowerCase());
+      }
+      const result = await client.query(query, params);
+      if(!categorie_produs){
+            const marcaRezultat = await client.query("SELECT * FROM unnest(enum_range(null::marca))");
+              
+            const marcaOptiuni = marcaRezultat.rows.map((row) => row.unnest);
+            console.log(marcaOptiuni)
+            res.json({produse: result.rows, marcaOptiuni: marcaOptiuni});      
+      }else{
+        res.json({produse: result.rows})
+      }
+             
+    } else {
+          const toateProdusele = await client.query("select * from produse");
+          res.json({produse: toateProdusele.rows});
+    }
   } catch (error) {
     console.error(error.message);
+    res.status(500).json({error: "Eroare la preluarea produselor"})
   }
 });
 
 app.get("/Delogare", function (req, res) {
   if (req.session.user) {
-    destroy(req.session, (err) => {
+    req.session.destroy((err) => {
       if (err) {
         console.log(err);
       } else {
         res.clearCookie("connect.sid");
-        res.status(200).send("Delogare realizata cu succes");
         res.redirect("/");
       }
     });
@@ -70,18 +95,19 @@ app.post("/Inregistrare", async (req, res) => {
         "INSERT INTO utilizatori (username, nume, prenume, email, parola) VALUES($1, $2, $3, $4, $5)",
         [username, nume, prenume, email, parolaCriptata]
       );
-
+      
+      if (newUser.rows.length > 0) 
       req.session.user = {
-        username: pLogin.rows[0].username,
-        nume: pLogin.rows[0].nume,
-        prenume: pLogin.rows[0].prenume,
-        email: pLogin.rows[0].email,
-        prenume: pLogin.rows[0].prenume,
+        id: newUser.rows[0].id,
+        username: newUser.rows[0].username,
+        nume: newUser.rows[0].nume,
+        prenume: newUser.rows[0].prenume,
+        email: newUser.rows[0].email
       };
-
+    
       res.json({ loggedIn: true, user: newUser.rows[0] });
 
-      res.json(newUser.rows[0]);
+      // res.json(newUser.rows[0]);
     } else {
       res
         .status(400)
@@ -105,11 +131,11 @@ app.post("/login", async (req, res) => {
 
     if (parolaCorecta) {
       req.session.user = {
+        id: pLogin.rows[0].id,
         username: pLogin.rows[0].username,
         nume: pLogin.rows[0].nume,
         prenume: pLogin.rows[0].prenume,
-        email: pLogin.rows[0].email,
-        prenume: pLogin.rows[0].prenume,
+        email: pLogin.rows[0].email
       };
       res.json({ loggedIn: true, username: req.body.username });
     } else {
