@@ -7,8 +7,6 @@ const client = new Client({
   port: 5432,
   database: "lucrareLicenta",
 });
-protocol = "http://";
-domainName = "localhost:5000";
 client.connect();
 
 module.exports = client;
