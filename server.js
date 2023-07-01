@@ -140,8 +140,6 @@ app.post("/Inregistrare", async (req, res) => {
         };
 
       res.json({ loggedIn: true, user: newUser.rows[0] });
-
-      // res.json(newUser.rows[0]);
     } else {
       res
         .status(400)
@@ -223,6 +221,13 @@ app.post("/place-order", async (req, res) => {
     });
 
     await Promise.all(orderItems);
+
+    cartItems.rows.map((item) =>
+      client.query("UPDATE produse SET stoc = stoc - $1 WHERE id = $2", [
+        parseInt(item.cantitate),
+        item.product_id,
+      ])
+    );
 
     req.session.cart = [];
 
@@ -575,12 +580,24 @@ app.post("/admin/product", async (req, res) => {
       imagine,
       compatibilitate,
       descriere,
+      stoc,
+      pret_vechi,
     } = req.body;
 
     // Add the product to the database
     const result = await client.query(
-      "INSERT INTO produse (nume, pret, categorie_produs, marca, imagine, compatibilitate, descriere) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
-      [nume, pret, categorie_produs, marca, imagine, compatibilitate, descriere]
+      "INSERT INTO produse (nume, pret, categorie_produs, marca, imagine, compatibilitate, descriere, stoc, pret_vechi) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *",
+      [
+        nume,
+        pret,
+        categorie_produs,
+        marca,
+        imagine,
+        compatibilitate,
+        descriere,
+        stoc,
+        pret_vechi,
+      ]
     );
 
     const newProduct = result.rows[0];
@@ -599,13 +616,31 @@ app.put("/admin/product/:id", async (req, res) => {
     }
 
     const { id } = req.params;
-    const { nume, pret, categorie_produs, marca, compatibilitate, descriere } =
-      req.body;
+    const {
+      nume,
+      pret,
+      categorie_produs,
+      marca,
+      compatibilitate,
+      descriere,
+      stoc,
+      pret_vechi,
+    } = req.body;
 
     // Update the product in the database
     const result = await client.query(
-      "UPDATE produse SET nume = $1, pret = $2, categorie_produs = $3, marca = $4, compatibilitate = $5, descriere = $6 WHERE id = $7 RETURNING *",
-      [nume, pret, categorie_produs, marca, compatibilitate, descriere, id]
+      "UPDATE produse SET nume = $1, pret = $2, categorie_produs = $3, marca = $4, compatibilitate = $5, descriere = $6, stoc = $7, pret_vechi = $8 WHERE id = $9 RETURNING *",
+      [
+        nume,
+        pret,
+        categorie_produs,
+        marca,
+        compatibilitate,
+        descriere,
+        stoc,
+        pret_vechi,
+        id,
+      ]
     );
 
     if (result.rowCount === 0) {
